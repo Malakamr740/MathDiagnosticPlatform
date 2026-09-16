@@ -6,6 +6,7 @@ import QuestionReviewCard from '../components/Reports/QuestionReviewCard'
 import { supabase } from '../lib/supabaseClient'
 import type { ReportData, TaxonomyType } from '../components/Reports/Types'
 
+
 function formatTime(s: number) {
   const m = Math.floor(s / 60)
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
