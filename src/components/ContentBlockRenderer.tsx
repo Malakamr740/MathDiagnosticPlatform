@@ -1,71 +1,82 @@
-import { InlineMath } from 'react-katex'
-import { parseContentText, type ContentBlock } from '../lib/contentBlocks'
+import React from 'react'
+import 'katex/dist/katex.min.css'
+import { InlineMath, BlockMath } from 'react-katex'
 
-export type { ContentBlock }
+export interface ContentBlock {
+  id?: string
+  type: 'text' | 'math' | 'latex' | 'image' | 'paragraph' | string
+  content?: string
+  text?: string
+  value?: string
+  url?: string
+  caption?: string
+}
 
 interface ContentBlockRendererProps {
-  blocks: ContentBlock[]
+  blocks?: ContentBlock[] | string | null
+  className?: string
 }
 
-export default function ContentBlockRenderer({ blocks }: ContentBlockRendererProps) {
+export const ContentBlockRenderer: React.FC<ContentBlockRendererProps> = ({
+  blocks,
+  className = '',
+}) => {
+  if (!blocks) return null
+
+  // If passed a simple string
+  if (typeof blocks === 'string') {
+    return <span className={className}>{blocks}</span>
+  }
+
+  if (!Array.isArray(blocks)) {
+    return <span className={className}>{String(blocks)}</span>
+  }
+
   return (
-    <span className="leading-relaxed break-words [overflow-wrap:anywhere]">
-      {blocks.map((block, index) => {
-        if (block.type === 'text') {
-          return <span key={index}>{block.value}</span>
+    <div className={`space-y-1.5 ${className}`}>
+      {blocks.map((block, idx) => {
+        const textVal = block.content ?? block.text ?? block.value ?? ''
+
+        if (block.type === 'latex' || block.type === 'math') {
+          try {
+            return (
+              <div key={block.id || idx} className="my-1 overflow-x-auto py-1">
+                <BlockMath math={textVal} />
+              </div>
+            )
+          } catch (e) {
+            return (
+              <code key={block.id || idx} className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-blue-700">
+                {textVal}
+              </code>
+            )
+          }
         }
-        if (block.type === 'math') {
+
+        if (block.type === 'image' && (block.url || textVal)) {
           return (
-            <span key={index} className="mx-1 inline-block align-middle">
-              <InlineMath math={block.latex} />
-            </span>
-          )
-        }
-        if (block.type === 'image') {
-          return (
-            <span key={index} className="block my-3">
+            <div key={block.id || idx} className="my-2">
               <img
-                src={block.url}
-                alt={block.alt || ''}
-                className="max-h-64 max-w-full rounded-md border border-slate-200"
+                src={block.url || textVal}
+                alt={block.caption || 'Question graphic'}
+                className="max-h-64 rounded-lg border border-slate-200 object-contain shadow-xs"
               />
               {block.caption && (
-                <span className="block text-sm text-slate-500 mt-1 italic">{block.caption}</span>
+                <p className="mt-1 text-xs text-slate-500 italic">{block.caption}</p>
               )}
-            </span>
+            </div>
           )
         }
-        if (block.type === 'table') {
-          return (
-            <table key={index} className="border-collapse my-3 text-base">
-              <tbody>
-                {block.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {row.map((cell, colIndex) => (
-                      <td
-                        key={colIndex}
-                        className={`border border-slate-300 px-3 py-1.5 ${
-                          rowIndex === 0 ? 'font-semibold bg-slate-50' : ''
-                        }`}
-                      >
-                        {cell.includes('$') ? (
-                          <ContentBlockRenderer blocks={parseContentText(cell)} />
-                        ) : (
-                          cell
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        }
-        if (block.type === 'break') {
-          return <br key={index} />
-        }
-        return null
+
+        // Inline LaTeX parsing: $...$ or standard text
+        return (
+          <p key={block.id || idx} className="text-xs leading-relaxed text-slate-800">
+            {textVal}
+          </p>
+        )
       })}
-    </span>
+    </div>
   )
 }
+
+export default ContentBlockRenderer

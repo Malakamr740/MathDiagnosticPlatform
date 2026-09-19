@@ -20,6 +20,7 @@ export default function AdminLayout({ children, title, subtitle, actions }: Admi
     { label: 'Question Bank', path: '/admin/questions', icon: '📚' },
     { label: 'Taxonomy', path: '/admin/taxonomy', icon: '🏷️' },
     { label: 'Levels & Courses', path: '/admin/levels', icon: '🎯' },
+    { label: 'Survey & Action Plans', path: '/admin/survey-action-plans', icon: '✨' },
     { label: 'Settings & Fields', path: '/admin/settings', icon: '⚙️' },
   ]
 

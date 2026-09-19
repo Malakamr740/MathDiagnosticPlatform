@@ -19,8 +19,9 @@ import OrganizationSettingsPage from './pages/OrganizationSettingsPage'
 import StudentAssessmentPage from './pages/StudentAssessmentPage'
 import TakeAssessmentPage from './pages/TakeAssessmentPage'
 import ReportPage from './pages/ReportPage'
+import { SurveyActionPlanAdminPage } from './pages/SurveyActionPlanAdminPage'
 
-export default function App() {
+export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -131,6 +132,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin/survey-action-plans"
+            element={
+              <ProtectedRoute>
+                <SurveyActionPlanAdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/settings"
             element={
               <ProtectedRoute>
@@ -146,3 +155,6 @@ export default function App() {
     </BrowserRouter>
   )
 }
+
+export default App
+

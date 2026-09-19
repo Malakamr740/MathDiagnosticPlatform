@@ -2,6 +2,65 @@ import type { ContentBlock } from '../ContentBlockRenderer'
 
 export type TaxonomyType = 'module' | 'category' | 'chapter' | 'lesson' | 'skill' | 'difficulty'
 
+export type DomainClassification = 'Strong' | 'Moderate' | 'Weak'
+
+export interface ChoiceOption {
+  id: string
+  content_blocks: ContentBlock[]
+  is_correct: boolean
+}
+
+export interface QuestionReviewItem {
+  question_id: string
+  content_blocks: ContentBlock[]
+  explanation_blocks: ContentBlock[]
+  difficulty: 'easy' | 'medium' | 'hard'
+  answer_type_code: string
+  points_possible: number
+  points_earned: number
+  is_correct: boolean
+  status?: 'correct' | 'incorrect' | 'unanswered'
+  is_answered?: boolean
+  time_spent_seconds: number
+  student_answer: Record<string, unknown>
+  category_name: string | null
+  lesson_name: string | null
+  skill_name: string | null
+  choices: ChoiceOption[]
+  correct_answer_data?: { value: unknown; tolerance?: number }
+}
+
+export interface DomainPerformance {
+  domainId: string
+  domainName: string
+  domainType: string
+  total: number
+  correct: number
+  unanswered: number
+  accuracyPct: number
+  avgTimeSec: number
+  classification: DomainClassification
+  performanceFact: string
+  actionableInsight: string
+}
+
+export interface CategoryTimeStats {
+  category: string
+  avgTimeSec: number
+  deltaFromOverallPct: number
+  flaggedSlow: boolean
+  questionCount: number
+  correctCount: number
+}
+
+export interface TimeAnalysisResult {
+  overallAvgTime: number
+  slowThresholdPct: number
+  categories: CategoryTimeStats[]
+  quickestSolved: QuestionReviewItem | null
+  slowestSolved: QuestionReviewItem | null
+}
+
 export interface StudentInfo {
   attempt_id: string
   assessment_name: string
@@ -22,6 +81,7 @@ export interface OverallResult {
   total_questions: number
   correct_count: number
   incorrect_count: number
+  unanswered_count?: number
   points_earned: number
   points_possible: number
   percentage: number
@@ -45,30 +105,6 @@ export interface BreakdownRow {
   percentage: number
   classification: 'strong' | 'weak' | 'average' | null
   avg_time_seconds?: number
-}
-
-export interface ChoiceOption {
-  id: string
-  content_blocks: ContentBlock[]
-  is_correct: boolean
-}
-
-export interface QuestionReviewItem {
-  question_id: string
-  content_blocks: ContentBlock[]
-  explanation_blocks: ContentBlock[]
-  difficulty: 'easy' | 'medium' | 'hard'
-  answer_type_code: string
-  points_possible: number
-  points_earned: number
-  is_correct: boolean
-  time_spent_seconds: number
-  student_answer: Record<string, unknown>
-  category_name: string | null
-  lesson_name: string | null
-  skill_name: string | null
-  choices: ChoiceOption[]
-  correct_answer_data?: { value: unknown; tolerance?: number }
 }
 
 export interface CourseItem {

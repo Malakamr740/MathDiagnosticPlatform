@@ -1,173 +1,68 @@
-import { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
-import DynamicRegistrationField from '../components/DynamicRegistrationField'
+import { Clock, BookOpen, ArrowRight, ShieldCheck } from 'lucide-react'
 
-interface Assessment {
-  id: string
-  name: string
-  description: string | null
-  instructions: string | null
-}
-
-interface RegistrationField {
-  id: string
-  label: string
-  field_key: string
-  field_type: 'text' | 'email' | 'phone' | 'number' | 'dropdown' | 'radio' | 'checkbox' | 'date' | 'textarea'
-  is_required: boolean
-  options: string[] | null
-  display_order: number
-}
-
-export default function StudentAssessmentPage() {
-  const { assessmentId } = useParams<{ assessmentId: string }>()
+export const StudentAssessmentPage: React.FC = () => {
+  const { assessmentId } = useParams()
   const navigate = useNavigate()
+  const [studentName, setStudentName] = useState('')
 
-  const [assessment, setAssessment] = useState<Assessment | null>(null)
-  const [fields, setFields] = useState<RegistrationField[]>([])
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchData()
-  }, [assessmentId])
-
-  async function fetchData() {
-    if (!assessmentId) return
-    setLoading(true)
-
-    const { data: assessmentData, error: aError } = await supabase
-      .from('assessments')
-      .select('id, name, description, instructions')
-      .eq('id', assessmentId)
-      .single()
-
-    if (aError || !assessmentData) {
-      setError('This assessment link is invalid or no longer available.')
-      setLoading(false)
-      return
-    }
-
-    const { data: fieldData } = await supabase
-      .from('registration_fields')
-      .select('id, label, field_key, field_type, is_required, options, display_order')
-      .order('display_order')
-
-    setAssessment(assessmentData)
-    setFields(fieldData ?? [])
-    setLoading(false)
-  }
-
-  function updateValue(fieldKey: string, value: string) {
-    setValues((prev) => ({ ...prev, [fieldKey]: value }))
-  }
-
-  function validate(): boolean {
-    const errors: Record<string, string> = {}
-    for (const field of fields) {
-      if (field.is_required && !values[field.field_key]?.trim()) {
-        errors[field.field_key] = 'This field is required.'
-      }
-      if (field.field_type === 'email' && values[field.field_key]) {
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailPattern.test(values[field.field_key])) {
-          errors[field.field_key] = 'Enter a valid email address.'
-        }
-      }
-    }
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
+  const handleStart = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-
-    if (!validate()) return
-
-    setSubmitting(true)
-
-    const { data, error: startError } = await supabase.rpc('start_attempt', {
-      p_assessment_id: assessmentId,
-      p_registration_data: values,
-    })
-
-    setSubmitting(false)
-
-    if (startError || !data || data.length === 0) {
-      setError(startError?.message || 'Could not start the assessment. Please try again.')
-      return
-    }
-
-    const { attempt_id, resume_token } = data[0]
-
-    // Navigate into the actual test-taking flow, carrying the resume
-    // token — this is what lets the student's browser prove which
-    // attempt is theirs on every subsequent request, without an account.
-    navigate(`/take/${attempt_id}?token=${resume_token}`)
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <p className="text-slate-600">Loading...</p>
-      </div>
-    )
-  }
-
-  if (error && !assessment) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-        <p className="text-red-600 bg-red-50 rounded-md px-4 py-3 max-w-md text-center">{error}</p>
-      </div>
-    )
+    navigate(`/take/attempt-${Date.now()}`)
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4">
-      <div className="max-w-xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
-          <h1 className="text-2xl font-semibold text-slate-900">{assessment?.name}</h1>
-          {assessment?.description && (
-            <p className="text-slate-600 mt-2">{assessment.description}</p>
-          )}
-          {assessment?.instructions && (
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-slate-700">
-              {assessment.instructions}
-            </div>
-          )}
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl p-7 border border-slate-200 shadow-sm space-y-5">
+        <div className="text-center space-y-1">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl mx-auto shadow-sm">
+            ∑
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 pt-2">Diagnostic Mathematics Assessment</h2>
+          <p className="text-xs text-slate-500">Assessment Code: {assessmentId || 'Standard'}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-medium text-slate-800">Before You Begin</h2>
+        <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 space-y-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-blue-600" />
+            <span>Time Allowed: 45 minutes</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-blue-600" />
+            <span>Format: 25 Multiple Choice Questions</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <span>Instant domain breakdown & post-assessment growth plan</span>
+          </div>
+        </div>
 
-          {fields.map((field) => (
-            <DynamicRegistrationField
-              key={field.id}
-              field={field}
-              value={values[field.field_key] ?? ''}
-              onChange={(value) => updateValue(field.field_key, value)}
-              error={fieldErrors[field.field_key]}
+        <form onSubmit={handleStart} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Enter Your Full Name</label>
+            <input
+              type="text"
+              required
+              value={studentName}
+              onChange={(e) => setStudentName(e.target.value)}
+              placeholder="e.g. Alex Morgan"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
             />
-          ))}
-
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>
-          )}
+          </div>
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full bg-blue-600 text-white font-medium py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition shadow-xs"
           >
-            {submitting ? 'Starting...' : 'Start Assessment'}
+            <span>Begin Diagnostic</span>
+            <ArrowRight className="h-4 w-4" />
           </button>
         </form>
       </div>
     </div>
   )
 }
+
+export default StudentAssessmentPage

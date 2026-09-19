@@ -1,158 +1,69 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import AdminLayout from '../components/AdminLayout'
+import { ArrowLeft, Save } from 'lucide-react'
 
-interface Exam {
-  id: string
-  name: string
-}
-
-export default function CreateAssessmentPage() {
+export const CreateAssessmentPage: React.FC = () => {
   const navigate = useNavigate()
-  const [exams, setExams] = useState<Exam[]>([])
-  const [examId, setExamId] = useState('')
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [instructions, setInstructions] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [minutes, setMinutes] = useState(45)
 
-  useEffect(() => {
-    async function fetchExams() {
-      const { data } = await supabase.from('exams').select('id, name').eq('is_active', true)
-      if (data) setExams(data)
-    }
-    fetchExams()
-  }, [])
-
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-
-    if (!name.trim()) {
-      setError('Assessment name is required.')
-      return
-    }
-
-    setSaving(true)
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      setError('You must be logged in.')
-      setSaving(false)
-      return
-    }
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profileData) {
-      setError('Could not determine your organization.')
-      setSaving(false)
-      return
-    }
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('assessments')
-      .insert({
-        organization_id: profileData.organization_id,
-        exam_id: examId || null,
-        name: name.trim(),
-        description: description.trim() || null,
-        instructions: instructions.trim() || null,
-        status: 'draft',
-      })
-      .select('id')
-      .single()
-
-    setSaving(false)
-
-    if (insertError || !inserted) {
-      setError(insertError?.message || 'Failed to create assessment.')
-      return
-    }
-
-    // Go straight to the new assessment's detail page — that's
-    // where modules get added next.
-    navigate(`/admin/assessments/${inserted.id}`)
+    navigate('/admin/assessments')
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="bg-white border-b border-slate-200 px-6 py-4">
-        <Link to="/admin/assessments" className="text-sm text-blue-600 hover:underline">
-          ← Back to Assessments
-        </Link>
-        <h1 className="text-xl font-semibold text-slate-800 mt-1">Create Assessment</h1>
-      </header>
+    <AdminLayout
+      title="Create New Assessment"
+      subtitle="Configure diagnostic parameters and modular assessment sections"
+      actions={
+        <button
+          type="button"
+          onClick={() => navigate('/admin/assessments')}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back</span>
+        </button>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-2xl border border-slate-200">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700">Assessment Title</label>
+          <input
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Grade 10 Comprehensive Algebra Diagnostic"
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+          />
+        </div>
 
-      <main className="p-6 max-w-xl mx-auto">
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. SAT Mathematics Diagnostic"
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
-            />
-          </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700">Time Limit (minutes)</label>
+          <input
+            type="number"
+            value={minutes}
+            onChange={(e) => setMinutes(Number(e.target.value))}
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Exam (optional)</label>
-            <select
-              value={examId}
-              onChange={(e) => setExamId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
-            >
-              <option value="">— None —</option>
-              {exams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Instructions (shown to students before starting)
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              rows={3}
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
-
+        <div className="pt-4 border-t border-slate-100 flex justify-end">
           <button
             type="submit"
-            disabled={saving}
-            className="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition shadow-xs"
           >
-            {saving ? 'Creating...' : 'Create Assessment'}
+            <Save className="h-3.5 w-3.5" />
+            <span>Create Assessment</span>
           </button>
-        </form>
-      </main>
-    </div>
+        </div>
+      </form>
+    </AdminLayout>
   )
 }
+
+export default CreateAssessmentPage

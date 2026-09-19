@@ -1,197 +1,124 @@
-import { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout'
-import { supabase } from '../lib/supabaseClient'
+import {
+  FileText,
+  HelpCircle,
+  FolderTree,
+  Sliders,
+  CheckCircle2,
+  TrendingUp,
+  ArrowRight,
+  Sparkles,
+} from 'lucide-react'
 
-interface DashboardStats {
-  totalQuestions: number
-  totalAssessments: number
-  totalAttempts: number
-  recentAttempts: Array<{
-    id: string
-    started_at: string
-    assessment: { name: string } | null
-    result: { percentage: number } | null
-  }>
-}
-
-export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalQuestions: 0,
-    totalAssessments: 0,
-    totalAttempts: 0,
-    recentAttempts: [],
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadStats() {
-      const [
-        { count: qCount },
-        { count: aCount },
-        { count: attCount },
-        { data: recentData },
-      ] = await Promise.all([
-        supabase.from('questions').select('*', { count: 'exact', head: true }),
-        supabase.from('assessments').select('*', { count: 'exact', head: true }),
-        supabase.from('attempts').select('*', { count: 'exact', head: true }),
-        supabase
-          .from('attempts')
-          .select(
-            `id, started_at, assessment:assessments(name), result:attempt_results(percentage)`
-          )
-          .order('started_at', { ascending: false })
-          .limit(5),
-      ])
-
-      setStats({
-        totalQuestions: qCount ?? 0,
-        totalAssessments: aCount ?? 0,
-        totalAttempts: attCount ?? 0,
-        recentAttempts: (recentData as unknown as DashboardStats['recentAttempts']) ?? [],
-      })
-      setLoading(false)
-    }
-
-    loadStats()
-  }, [])
+export const AdminDashboardPage: React.FC = () => {
+  const cards = [
+    {
+      title: 'Post-Assessment Surveys & Action Plans',
+      description: 'Manage diagnostic reflection questions and personalized growth action plans.',
+      path: '/admin/survey-action-plans',
+      icon: Sparkles,
+      color: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+      badge: 'New Feature',
+    },
+    {
+      title: 'Assessment Catalog',
+      description: 'Design adaptive math diagnostics, timed benchmarks, and module evaluations.',
+      path: '/admin/assessments',
+      icon: FileText,
+      color: 'bg-blue-50 text-blue-600 border-blue-200',
+    },
+    {
+      title: 'Question Bank',
+      description: 'Manage taxonomy-aligned items, answer choices, and mathematical explanations.',
+      path: '/admin/questions',
+      icon: HelpCircle,
+      color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    },
+    {
+      title: 'Curriculum Taxonomy',
+      description: 'Explore hierarchical domains, standards, clusters, and objective trees.',
+      path: '/admin/taxonomy',
+      icon: FolderTree,
+      color: 'bg-amber-50 text-amber-600 border-amber-200',
+    },
+    {
+      title: 'Levels & Courses',
+      description: 'Configure grade bands, pacing thresholds, and difficulty scoring curves.',
+      path: '/admin/levels',
+      icon: Sliders,
+      color: 'bg-purple-50 text-purple-600 border-purple-200',
+    },
+    {
+      title: 'Diagnostic Reports Demo',
+      description: 'Review comprehensive student analytics, domain mastery, and review cards.',
+      path: '/report/demo-attempt',
+      icon: TrendingUp,
+      color: 'bg-rose-50 text-rose-600 border-rose-200',
+    },
+  ]
 
   return (
     <AdminLayout
-      title="Admin Dashboard"
-      subtitle="Overview of question bank, active diagnostics, and student activity"
-      actions={
-        <div className="flex gap-2">
-          <Link
-            to="/admin/assessments/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition"
-          >
-            + New Assessment
-          </Link>
-          <Link
-            to="/admin/questions/new"
-            className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition"
-          >
-            + Create Question
-          </Link>
-        </div>
-      }
+      title="Diagnostic Platform Administration"
+      subtitle="Overview of your diagnostic assessments, curricular taxonomy, and student action workflows"
     >
       <div className="space-y-6">
-        {/* Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Total Questions
-            </p>
-            <p className="text-3xl font-extrabold text-slate-900 mt-2">
-              {loading ? '...' : stats.totalQuestions}
-            </p>
-            <Link
-              to="/admin/questions"
-              className="text-xs text-blue-600 hover:underline mt-2 inline-block font-medium"
-            >
-              Browse Question Bank →
-            </Link>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {cards.map((c) => {
+            const Icon = c.icon
+            return (
+              <Link
+                key={c.path}
+                to={c.path}
+                className="group relative bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-300 transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2.5 rounded-xl border ${c.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    {c.badge && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                        {c.badge}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="mt-4 font-semibold text-slate-900 group-hover:text-blue-600 transition flex items-center gap-1">
+                    {c.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500 leading-relaxed">{c.description}</p>
+                </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Assessments Created
-            </p>
-            <p className="text-3xl font-extrabold text-slate-900 mt-2">
-              {loading ? '...' : stats.totalAssessments}
-            </p>
-            <Link
-              to="/admin/assessments"
-              className="text-xs text-blue-600 hover:underline mt-2 inline-block font-medium"
-            >
-              Manage Assessments →
-            </Link>
-          </div>
-
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Student Attempts
-            </p>
-            <p className="text-3xl font-extrabold text-slate-900 mt-2">
-              {loading ? '...' : stats.totalAttempts}
-            </p>
-            <span className="text-xs text-slate-500 mt-2 inline-block">
-              Recorded diagnostic test sessions
-            </span>
-          </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-600 group-hover:text-blue-600">
+                  <span>Open Management</span>
+                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition" />
+                </div>
+              </Link>
+            )
+          })}
         </div>
 
-        {/* Quick Access & Recent Attempts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 2 Cols: Recent Submissions */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs p-5">
-            <h2 className="text-base font-bold text-slate-900 mb-4">Recent Test Attempts</h2>
-            {stats.recentAttempts.length === 0 ? (
-              <p className="text-sm text-slate-500 py-6 text-center">
-                No student attempts recorded yet.
-              </p>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {stats.recentAttempts.map((att) => (
-                  <div key={att.id} className="py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {att.assessment?.name || 'Assessment'}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {new Date(att.started_at).toLocaleDateString()} at{' '}
-                        {new Date(att.started_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-slate-700">
-                        {att.result?.percentage !== undefined ? `${att.result.percentage}%` : '—'}
-                      </span>
-                      <Link
-                        to={`/admin/attempts/${att.id}`}
-                        className="text-xs text-blue-600 hover:underline font-medium"
-                      >
-                        View Results →
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Quick status banner */}
+        <div className="rounded-2xl border border-blue-100 bg-linear-to-r from-blue-50/70 to-indigo-50/70 p-5 flex items-start gap-4">
+          <div className="p-2 rounded-xl bg-blue-600 text-white shrink-0 mt-0.5">
+            <CheckCircle2 className="h-5 w-5" />
           </div>
-
-          {/* Right Col: Shortcut Actions */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-3">
-            <h2 className="text-base font-bold text-slate-900 mb-2">Shortcuts</h2>
-            <Link
-              to="/admin/taxonomy"
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 text-sm font-medium transition"
-            >
-              <span>🏷️ Taxonomy Hierarchy</span>
-              <span className="text-slate-400">→</span>
-            </Link>
-            <Link
-              to="/admin/levels"
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 text-sm font-medium transition"
-            >
-              <span>🎯 Levels & Recommendations</span>
-              <span className="text-slate-400">→</span>
-            </Link>
-            <Link
-              to="/admin/settings"
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 text-sm font-medium transition"
-            >
-              <span>⚙️ Registration Fields & Org</span>
-              <span className="text-slate-400">→</span>
-            </Link>
+          <div>
+            <h4 className="text-sm font-semibold text-slate-900">
+              System Ready & Fully Synchronized
+            </h4>
+            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+              Taxonomy trees, post-assessment reflection surveys, and personalized multi-week action
+              plans are actively linked. Access the new Survey & Action Plan admin tab to customize
+              student diagnostic workflows.
+            </p>
           </div>
         </div>
       </div>
     </AdminLayout>
   )
 }
+
+export default AdminDashboardPage

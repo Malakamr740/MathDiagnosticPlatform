@@ -38,8 +38,8 @@ export default function ChoicesEditor({ choices, onChange }: ChoicesEditorProps)
   return (
     <div className="space-y-2">
       {choices.map((choice, index) => {
-        const textValue =
-          choice.content_blocks[0]?.type === 'text' ? choice.content_blocks[0].value : ''
+        const textValue: string =
+          (choice.content_blocks?.[0]?.type === 'text' ? choice.content_blocks[0].value : '') || ''
 
         return (
           <div key={index} className="flex items-center gap-2">

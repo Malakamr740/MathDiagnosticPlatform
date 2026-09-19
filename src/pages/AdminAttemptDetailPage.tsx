@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout'
-import TaxonomyTree from '../components/Reports/TaxonomyTree'
+import { TaxonomyTree } from '../components/Reports/TaxonomyTree'
 import QuestionReviewCard from '../components/Reports/QuestionReviewCard'
+import DomainCard from '../components/Reports/DomainCard'
+import TimeAnalysisSection from '../components/Reports/TimeAnalysisSection'
+import ThreeStateDonutChart from '../components/Reports/ThreeStateDonutChart'
 import { supabase } from '../lib/supabaseClient'
-import type { ReportData, TaxonomyType } from '../components/Reports/Types'
-
+import { exportElementToPDF } from '../lib/pdfExport'
+import {
+  STRONG_DOMAIN_THRESHOLD,
+  MODERATE_DOMAIN_THRESHOLD,
+  TIME_SLOW_THRESHOLD_PCT,
+  computeDomainPerformance,
+  computeTimeAnalysis,
+  computeThreeStateSummary,
+} from '../lib/diagnosticAnalytics'
+import type { CourseItem, QuestionReviewItem, ReportData, TaxonomyType } from '../components/Reports/Types'
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60)
@@ -18,7 +29,10 @@ export default function AdminAttemptDetailPage() {
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [filter, setFilter] = useState<{ type: TaxonomyType; label: string } | null>(null)
+  const [exporting, setExporting] = useState(false)
+
   const questionsRef = useRef<HTMLDivElement>(null)
+  const printContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function fetchReport() {
@@ -41,24 +55,60 @@ export default function AdminAttemptDetailPage() {
 
   const derived = useMemo(() => {
     if (!report) return null
-    const { student_info, overall, breakdowns } = report
+    const { student_info, overall } = report
     const studentName =
       (student_info.registration_responses.full_name as string) ||
       (student_info.registration_responses.name as string) ||
       'Student'
+
+    const domainPerf = computeDomainPerformance(
+      report,
+      STRONG_DOMAIN_THRESHOLD,
+      MODERATE_DOMAIN_THRESHOLD
+    )
+
+    const timeAnalysis = computeTimeAnalysis(
+      report.questions,
+      overall.avg_time_per_question,
+      TIME_SLOW_THRESHOLD_PCT
+    )
+
+    const threeState = computeThreeStateSummary(report.questions)
+
     return {
       studentName,
+      domainPerf,
+      timeAnalysis,
+      threeState,
       avgTime: overall.avg_time_per_question,
       conceptual: Math.max(0, overall.incorrect_count - overall.rushed_mistakes_count - overall.timesink_mistakes_count),
-      strongSkills: breakdowns.filter((b) => b.type === 'skill' && b.classification === 'strong'),
-      weakSkills: breakdowns.filter((b) => b.type === 'skill' && b.classification === 'weak'),
     }
   }, [report])
+
+  async function handleExportPDF() {
+    if (!printContainerRef.current || !derived || !report) return
+    setExporting(true)
+    const sanitizedName = derived.studentName.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const filename = `Report_${sanitizedName}_${new Date().toISOString().split('T')[0]}.pdf`
+
+    try {
+      await exportElementToPDF({
+        element: printContainerRef.current,
+        filename,
+        autoDownload: true,
+      })
+    } catch (err) {
+      console.error('PDF export error:', err)
+      window.print()
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const visibleQuestions = useMemo(() => {
     if (!report) return []
     if (!filter) return report.questions
-    return report.questions.filter((q) => {
+    return report.questions.filter((q: QuestionReviewItem) => {
       switch (filter.type) {
         case 'category': return q.category_name === filter.label
         case 'lesson': return q.lesson_name === filter.label
@@ -91,19 +141,31 @@ export default function AdminAttemptDetailPage() {
   }
 
   const { student_info, overall, breakdowns, questions, courses } = report
-  const { studentName, avgTime, conceptual, strongSkills, weakSkills } = derived
+  const { studentName, domainPerf, timeAnalysis, threeState, avgTime, conceptual } = derived
 
   return (
     <AdminLayout
       title="Student diagnostic report"
       subtitle={`${studentName} · ${student_info.assessment_name}`}
       actions={
-        <button onClick={() => window.print()} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
-          Print / Save PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            {exporting ? 'Generating PDF...' : 'Download PDF'}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Print
+          </button>
+        </div>
       }
     >
-      <div className="print-page space-y-6">
+      <div ref={printContainerRef} className="print-page space-y-6">
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <InsightCard label="Score" value={`${overall.percentage}%`} />
           <InsightCard label="Tier" value={overall.level?.name || 'Evaluated'} />
@@ -111,6 +173,70 @@ export default function AdminAttemptDetailPage() {
           <InsightCard label="Questions" value={`${questions.length}`} />
         </section>
 
+        {/* Three-State Classification */}
+        <section>
+          <ThreeStateDonutChart
+            correctCount={threeState.correctCount}
+            incorrectCount={threeState.incorrectCount}
+            unansweredCount={threeState.unansweredCount}
+            total={threeState.total}
+          />
+        </section>
+
+        {/* Strong Domains Section */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Strong Domains</h2>
+              <p className="text-xs text-slate-500">
+                Taxonomy areas with &ge; {STRONG_DOMAIN_THRESHOLD}% accuracy
+              </p>
+            </div>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+              {domainPerf.strongDomains.length} Domains
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {domainPerf.strongDomains.length === 0 ? (
+              <p className="text-sm text-slate-500 col-span-2 py-3">No domains exceeded {STRONG_DOMAIN_THRESHOLD}% accuracy.</p>
+            ) : (
+              domainPerf.strongDomains.map((d) => (
+                <DomainCard key={d.domainId} domain={d} type="strong" />
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Weak Domains Section */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Weak Domains (Action Areas)</h2>
+              <p className="text-xs text-slate-500">
+                Taxonomy areas with &lt; {MODERATE_DOMAIN_THRESHOLD}% accuracy requiring review
+              </p>
+            </div>
+            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+              {domainPerf.weakDomains.length} Domains
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {domainPerf.weakDomains.length === 0 ? (
+              <p className="text-sm text-emerald-700 col-span-2 py-3">No domains below {MODERATE_DOMAIN_THRESHOLD}% accuracy.</p>
+            ) : (
+              domainPerf.weakDomains.map((d) => (
+                <DomainCard key={d.domainId} domain={d} type="weak" />
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Time Analysis Section */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <TimeAnalysisSection timeAnalysis={timeAnalysis} />
+        </section>
+
+        {/* Taxonomy Mastery Tree */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <SectionTitle title="Taxonomy mastery" subtitle="Tap any node to filter the questions below" />
           <div className="mt-4">
@@ -118,6 +244,7 @@ export default function AdminAttemptDetailPage() {
           </div>
         </section>
 
+        {/* Where points were lost */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <SectionTitle title="Where points were lost" />
           <div className="mt-4 flex flex-wrap gap-3">
@@ -131,19 +258,12 @@ export default function AdminAttemptDetailPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <SectionTitle title="Strengths & gaps" />
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <ListBlock title="Strengths" items={strongSkills.map((s) => `${s.label} · ${s.percentage}%`)} tone="border-emerald-200 bg-emerald-50 text-emerald-800" />
-            <ListBlock title="Gaps to address" items={weakSkills.map((s) => `${s.label} · ${s.percentage}%`)} tone="border-amber-200 bg-amber-50 text-amber-800" />
-          </div>
-        </section>
-
+        {/* Question Review */}
         <section ref={questionsRef} className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <SectionTitle
               title="Question review"
-              subtitle={filter ? `Filtered by ${filter.label}` : 'Tap a question to reveal the explanation'}
+              subtitle={filter ? `Filtered by ${filter.label}` : 'Detailed diagnostic breakdown of each question'}
             />
             {filter && (
               <button
@@ -158,7 +278,7 @@ export default function AdminAttemptDetailPage() {
             {visibleQuestions.length === 0 ? (
               <p className="text-sm text-slate-500">No questions match this filter.</p>
             ) : (
-              visibleQuestions.map((q) => (
+              visibleQuestions.map((q: QuestionReviewItem) => (
                 <QuestionReviewCard
                   key={q.question_id}
                   question={q}
@@ -171,6 +291,7 @@ export default function AdminAttemptDetailPage() {
           </div>
         </section>
 
+        {/* Recommendations */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <SectionTitle title="Recommendation" />
           <p className="mt-2 text-sm text-slate-700">
@@ -178,7 +299,7 @@ export default function AdminAttemptDetailPage() {
           </p>
           {courses.length > 0 && (
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {courses.map((c) => (
+              {courses.map((c: CourseItem) => (
                 <div key={c.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="font-medium text-slate-900">{c.name}</div>
                   <p className="mt-1 text-sm text-slate-600">{c.description || 'Recommended follow-up course.'}</p>
@@ -215,16 +336,5 @@ function ErrorChip({ label, count, tone }: { label: string; count: number; tone:
     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${tone}`}>
       {label}: {count}
     </span>
-  )
-}
-
-function ListBlock({ title, items, tone }: { title: string; items: string[]; tone: string }) {
-  return (
-    <div className={`rounded-xl border p-4 ${tone}`}>
-      <div className="font-semibold">{title}</div>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-        {items.length ? items.map((item) => <li key={item}>{item}</li>) : <li>None identified</li>}
-      </ul>
-    </div>
   )
 }

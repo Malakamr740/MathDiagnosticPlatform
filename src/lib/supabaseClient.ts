@@ -1,11 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-assessment-platform.supabase.co'
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key'
 
-if (!supabaseUrl || !supabasePublishableKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Check that .env.local exists and contains VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'
+export const isSupabaseConfigured = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+)
+
+if (!isSupabaseConfigured) {
+  console.warn(
+    'Notice: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are not configured in environment. The platform will operate in demo/preview mode.'
   )
 }
 

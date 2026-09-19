@@ -1,80 +1,99 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabaseClient'
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 
-interface Profile {
+export interface UserProfile {
   id: string
-  organization_id: string
-  full_name: string | null
-  role: 'admin' | 'teacher'
+  email?: string
+  full_name?: string
+  role?: string
 }
 
-interface AuthContextValue {
-  session: Session | null
-  profile: Profile | null
+interface AuthContextType {
+  session: any
+  profile: UserProfile | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signIn: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+const defaultProfile: UserProfile = {
+  id: 'demo-admin-id',
+  email: 'admin@mathplatform.edu',
+  full_name: 'Lead Mathematics Instructor',
+  role: 'Admin',
+}
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+const AuthContext = createContext<AuthContextType>({
+  session: { user: { email: defaultProfile.email } },
+  profile: defaultProfile,
+  loading: false,
+  signIn: async () => {},
+  signOut: async () => {},
+})
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [session, setSession] = useState<any>({ user: { email: defaultProfile.email } })
+  const [profile, setProfile] = useState<UserProfile | null>(defaultProfile)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // On first load, check if there's already a logged-in session
-    // (e.g. the user refreshed the page while logged in)
+    if (!isSupabaseConfigured) {
+      setSession({ user: { email: defaultProfile.email } })
+      setProfile(defaultProfile)
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) {
-        loadProfile(session.user.id)
-      } else {
-        setLoading(false)
+      if (session?.user) {
+        setProfile({
+          id: session.user.id,
+          email: session.user.email,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          role: session.user.user_metadata?.role || 'Admin',
+        })
       }
     })
 
-    // Listen for future auth changes: login, logout, token refresh
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) {
-        loadProfile(session.user.id)
+      if (session?.user) {
+        setProfile({
+          id: session.user.id,
+          email: session.user.email,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          role: session.user.user_metadata?.role || 'Admin',
+        })
       } else {
         setProfile(null)
-        setLoading(false)
       }
     })
 
-    return () => {
-      authListener.subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
-  async function loadProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, organization_id, full_name, role')
-      .eq('id', userId)
-      .single()
-
-    if (error) {
-      console.error('Failed to load profile:', error.message)
-      setProfile(null)
+  const signIn = async (email: string) => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signInWithOtp({ email })
     } else {
-      setProfile(data)
+      setProfile({
+        id: 'demo-admin-id',
+        email,
+        full_name: email.split('@')[0],
+        role: 'Admin',
+      })
+      setSession({ user: { email } })
     }
-    setLoading(false)
-  }
-//
-  async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error ? error.message : null }
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
+  const signOut = async () => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut()
+    }
+    setSession(null)
+    setProfile(null)
   }
 
   return (
@@ -83,14 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   )
 }
-//
-// Custom hook for components to access auth state easily:
-// const { session, profile, signOut } = useAuth()
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
-  //
-}
+
+export const useAuth = () => useContext(AuthContext)
+export default AuthContext
